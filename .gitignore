@@ -2,8 +2,6 @@
 __pycache__/
 *.pyc
 .DS_Store
-salida/*
-!salida/.gitkeep
-*.npz
-*.gif
-*.mp4
+# en salida/ se versionan figuras y tablas; no los resultados numéricos ni los logs
+salida/**/*.npz
+salida/**/*.txt

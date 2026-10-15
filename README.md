@@ -48,7 +48,7 @@ transporte/      ejemplo de transporte (Sección 4.7.5)
                  identidad exacta, posterior GP en espacios reducidos, operadores en Fourier, estilo de figuras
   experimentos/  cómputo -> salida/transporte/<experimento>/resultados.npz
   figuras/       figuras y tablas a partir de resultados.npz
-salida/          vacía en el repositorio; la llenan los scripts
+salida/          figuras (PDF, GIF, MP4) y tablas (LaTeX) generadas; los .npz no se versionan
 ```
 
 ## Scripts, salidas y secciones
@@ -74,6 +74,7 @@ cuando supera 1 GB. Cada script imprime sus números y chequeos (conviene guarda
 | `transporte.experimentos.comparacion_justa entero` / `ad` + `figuras.comparacion_justa` | `tabla_comparacion_justa.tex`, `figura_presentacion` (entero), `figura_presentacion_reconstruccion` y `_error` (advección-difusión) | 4.7.5 | 1,5 min cada uno |
 | `transporte.figuras.sensores` | `sensores_2D_64`, `sensores_AD`, `sensores_comparacion` | 4.7.5 | 5 s |
 | `transporte.figuras.resumen_AD` | `resumen_errores_AD` | 4.7.5 | 2 s |
+| `transporte.experimentos.presupuesto_AD` + `figuras.presupuesto_AD` | `presupuesto/tabla_presupuesto_AD.tex` (advección-difusión a igual presupuesto total, m en {2, 4, 8}) | 4.7.5 | 8 min (5 GB) |
 
 Los experimentos de `transporte/` verifican con `assert` sus cuentas: el operador (adjunta, unitariedad, `np.roll`),
 `alpha_N` por bloques contra el cálculo denso, el posterior y la identidad exacta en espacios reducidos contra
