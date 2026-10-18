@@ -20,6 +20,8 @@ Identidad exacta vs MC con |z| < 4 en todos los estimadores.
 
 Uso:  python -m transporte.experimentos.presupuesto_AD            (todo)
       python -m transporte.experimentos.presupuesto_AD estimar    (cronometra los casos más caros y estima el total)
+      python -m transporte.experimentos.presupuesto_AD ejemplo    (ingenua con 1024 y 3072 sensores, ell = 2:
+                                                                  reconstrucciones para la figura; ~30 s)
 Guarda salida/transporte/adveccion_difusion/presupuesto/resultados.npz; la tabla, en
 transporte/figuras/presupuesto_AD.py.
 """
@@ -48,7 +50,7 @@ S_AD, NU, RAZON = 0.75, 0.1, 0.20
 ELLS = cfg.ELLS_64                                           # (2, 8)
 PRESUPUESTOS = (2048, 3072)
 SEPARACIONES = (2, 4, 8)
-COLUMNAS_INGENUA = {2048: (0, 2), 3072: (0, 1, 2)}           # columnas x mod 4 de la ingenua (P / 64 columnas)
+COLUMNAS_INGENUA = {1024: (0,), 2048: (0, 2), 3072: (0, 1, 2)}   # columnas x mod 4 de la ingenua (P / 64 columnas)
 
 
 def configuraciones():
@@ -154,12 +156,31 @@ def ingenua(P, ell, ctx, TS_cache):
     Mc = P // 1024 - 1
     ruido = np.random.default_rng(cfg.SEED + 1000 * Mc).standard_normal((R, N + 1, Mc + 1, 1024)).reshape(R, N + 1, -1)
     u = (ctx["Anf"][None] + fz_["delta"])[:, :, nv.pix] + cfg.SIGMA_N * ruido
-    e2 = np.sum((nv.reconstruir(u) - ctx["f"]) ** 2, axis=1)
+    fh = nv.reconstruir(u)
+    e2 = np.sum((fh - ctx["f"]) ** 2, axis=1)
     ex = energia(TS_cache[P], ctx["Lt"], fz.raiz_psd(fz_["Sigma_S"])) + cfg.SIGMA_N ** 2 * nv.traza_inv
     z = z_mc(e2, ex)
     assert abs(z) < 4, f"ingenua: MC != exacto (P {P}, ell {ell:g}): z = {z:.1f}"
     return dict(med=np.median(np.sqrt(e2)) / ctx["nf"], exacto=np.sqrt(ex) / ctx["nf"], z=z, alfa=nv.alfa,
-                beta=nv.beta)
+                beta=nv.beta), fh[0]
+
+
+def ejemplo_ingenua(ell=2.0, presupuestos=(1024, 3072)):
+    """Ingenua con 1024 (columnas cada 4) y 3072 sensores: medianas y la reconstrucción de la realización 0."""
+    t0 = time.perf_counter()
+    out = salida("transporte", "adveccion_difusion", "presupuesto")
+    ctx = preparar()
+    datos = {}
+    for P in presupuestos:
+        r, fh0 = ingenua(P, ell, ctx, {})
+        datos.update({f"P{P}_{k}": v for k, v in r.items()}, **{f"P{P}_f_hat": fh0})
+        print(f"ingenua P = {P}: alpha_8 = {r['alfa']:.3e}, mediana {r['med']:.4f}, exacto RMS {r['exacto']:.4f}, "
+              f"|z| = {abs(r['z']):.2f}; realización 0: {np.linalg.norm(fh0 - ctx['f']) / ctx['nf']:.4f}")
+    ruta = os.path.join(out, "ejemplo_ingenua.npz")
+    np.savez(ruta, f=ctx["f"], delta_N=ctx["forzados"][ell]["delta"][0, N], sw=ctx["forzados"][ell]["sw"], ell=ell,
+             presupuestos=np.array(presupuestos), fuente=np.array(cfg.FUENTE_64), **datos)
+    print(f"tiempo {time.perf_counter() - t0:.0f} s")
+    print("archivo: " + os.path.relpath(ruta, salida()))
 
 
 def correr(solo_estimar=False):
@@ -184,7 +205,7 @@ def correr(solo_estimar=False):
             tiempos[(m, M)] = (t_op, time.perf_counter() - t1)
             del B, Opinv, TS
         t1 = time.perf_counter()
-        ingenua(3072, ELLS[0], ctx, {})
+        ingenua(3072, ELLS[0], ctx, {})[0]
         t_ing = time.perf_counter() - t1
         print(f"preparación (validación, forzados): {t_prep:.0f} s; ingenua (P = 3072): {t_ing:.0f} s")
         for (m, M), (a, b) in tiempos.items():
@@ -216,7 +237,7 @@ def correr(solo_estimar=False):
     TS_ing, ing = {}, {}
     for P in PRESUPUESTOS:
         for ell in ELLS:
-            ing[(P, ell)] = ingenua(P, ell, ctx, TS_ing)
+            ing[(P, ell)] = ingenua(P, ell, ctx, TS_ing)[0]
             chequeos.append(ing[(P, ell)]["z"])
     for r in filas:
         g = ing[(r["P"], r["ell"])]
@@ -277,4 +298,7 @@ def correr(solo_estimar=False):
 
 
 if __name__ == "__main__":
-    correr(solo_estimar="estimar" in sys.argv[1:])
+    if "ejemplo" in sys.argv[1:]:
+        ejemplo_ingenua()
+    else:
+        correr(solo_estimar="estimar" in sys.argv[1:])

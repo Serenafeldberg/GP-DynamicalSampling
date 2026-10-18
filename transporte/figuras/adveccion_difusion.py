@@ -2,7 +2,7 @@
 Figuras y tablas de advección-difusión (Sección 4.7.5), leyendo salida/transporte/adveccion_difusion/
 resultados_diagnostico.npz y resultados.npz (y, como referencia entera, salida/transporte/experimento_2D_64/
 resultados.npz): alpha_vs_nu.pdf, alpha_vs_s.pdf, tabla_diagnostico_AD.tex, tabla_barrido_s_AD.tex,
-error_vs_M_AD.pdf, reconstruccion_AD.pdf, cuadros_AD.pdf y tabla_AD.tex.
+error_vs_M_AD.pdf, reconstruccion_AD.pdf, cuadros_AD.pdf, cuadros_AD_n0_n8.pdf y tabla_AD.tex.
 """
 import os
 
@@ -224,7 +224,7 @@ def figura_reconstruccion_ad(f, ej, fuente, ruta):
     plt.close(fig)
 
 
-def figura_cuadros_ad(ej, fuente, ruta, ns=(0, 2, 4, 6, 8)):
+def figura_cuadros_ad(ej, fuente, ruta, ns=(0, 2, 4, 6, 8), notas=True):
     Anf, delta = ej["Anf"].reshape(-1, L, L), ej["delta"].reshape(-1, L, L)
     y = Anf + delta
     a = np.max(np.abs(delta[list(ns)]))
@@ -241,9 +241,12 @@ def figura_cuadros_ad(ej, fuente, ruta, ns=(0, 2, 4, 6, 8)):
         axs[i, 0].set_ylabel(etq, fontsize=13)
         barra(fig, im, axs[i, :].tolist())
     s, nu, ell, razon, M = EJEMPLO
-    fig.suptitle(f"$s = {num_m(s)}$, $\\nu = {num_m(nu)}$, $\\ell = {num_m(ell)}$, razón de forzado {num_t(razon)}, $M = {M}$, fuente "
-                 f"${fuente}$ (+); misma realización que reconstruccion_AD.pdf\n"
-                 "filas 1 y 3: valores fuera de [0, 1] saturados", fontsize=10)
+    corte = "\n" if len(ns) <= 3 else " "
+    titulo = (f"$s = {num_m(s)}$, $\\nu = {num_m(nu)}$, $\\ell = {num_m(ell)}$, razón de forzado {num_t(razon)},{corte}$M = {M}$, "
+              f"fuente ${fuente}$ (+)")
+    if notas:
+        titulo += f";{corte}misma realización que reconstruccion_AD.pdf\nfilas 1 y 3: valores fuera de [0, 1] saturados"
+    fig.suptitle(titulo, fontsize=10)
     fig.savefig(ruta, bbox_inches="tight")
     plt.close(fig)
 
@@ -300,9 +303,11 @@ def main():
         nuevos = [os.path.join(OUT, n) for n in ("error_vs_M_AD.pdf", "reconstruccion_AD.pdf", "cuadros_AD.pdf",
                                                  "tabla_AD.tex")]
         figura_error_ad(filas, ref, denso, nuevos[0])
-        figura_reconstruccion_ad(z["f"], ejemplo, tuple(z["fuente"]), nuevos[1])
-        figura_cuadros_ad(ejemplo, tuple(z["fuente"]), nuevos[2])
+        figura_reconstruccion_ad(z["f"], ejemplo, tuple(int(c) for c in z["fuente"]), nuevos[1])
+        figura_cuadros_ad(ejemplo, tuple(int(c) for c in z["fuente"]), nuevos[2])
         tabla_ad(filas, ref, denso, nuevos[3])
+        nuevos.append(os.path.join(OUT, "cuadros_AD_n0_n8.pdf"))
+        figura_cuadros_ad(ejemplo, tuple(int(c) for c in z["fuente"]), nuevos[-1], ns=(0, 8), notas=False)
         archivos += nuevos
     print("archivos: " + ", ".join(os.path.relpath(a, salida()) for a in archivos))
 
