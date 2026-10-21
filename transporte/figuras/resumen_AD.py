@@ -1,6 +1,6 @@
 """
 Resumen de errores de advección-difusión contra la profundidad M para la configuración elegida
-(s = 0,75, nu = 0,1, ell = 2, razón 0,2, N = 8): sin corregir, naive dinámico, GP, oráculo y denso.
+(s = 0,75, nu = 0,1, ell = 2, razón 0,2, N = 8): sin corregir, ingenua (naive dinámico), GP, oráculo y denso.
 
 Lee salida/transporte/adveccion_difusion/resultados.npz (sin corregir, GP, oráculo, denso) y
 salida/transporte/adveccion_difusion/comparacion_justa/resultados.npz (naive dinámico, M = 1, 2, 3).
@@ -20,7 +20,7 @@ S, NU, ELL, RAZON = 0.75, 0.1, 2.0, 0.2
 MS = (1, 2, 3)
 C = plt.get_cmap("tab10").colors
 ESTILO = {"sc": ("sin corregir (1024 sensores)", C[0], "o", "-"),
-          "dinamico": ("naive dinámico ($1024\\,(M+1)$ sensores)", C[4], "D", "-"),
+          "dinamico": ("ingenua ($1024\\,(M+1)$ sensores)", C[4], "D", "-"),
           "gp": ("GP ($1024\\,(M+1)$ sensores)", C[1], "s", "-"),
           "oraculo": ("oráculo (1024 sensores + $\\delta$ verdadero)", C[2], "^", "-")}
 

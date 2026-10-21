@@ -48,10 +48,12 @@ def make_system(seed=SEED_SISTEMA):
 
 
 def krylov_basis(A, G):
-    """Base ortonormal ordenada por profundidad: las primeras p*M columnas generan S_{M-1}."""
-    cols, Ak = [], np.eye(d)
-    for _ in range(d // p):
-        cols.append(Ak.T @ G)
+    """Base ortonormal ordenada por profundidad: las primeras p*M columnas generan S_{M-1}.
+    Vale también en C^d: (A^m)^* g_i con la traspuesta conjugada."""
+    d_, p_ = A.shape[0], G.shape[1]
+    cols, Ak = [], np.eye(d_)
+    for _ in range(d_ // p_):
+        cols.append(Ak.conj().T @ G)
         Ak = A @ Ak
     B, _ = np.linalg.qr(np.hstack(cols))
     return B
@@ -60,15 +62,16 @@ def krylov_basis(A, G):
 def make_sigma(kind, A, G):
     """Covarianza espacial Sigma_w del forzado."""
     B = krylov_basis(A, G)
+    d_ = A.shape[0]
     if kind == "rango_bajo":          # rango RANGO dentro de S_1 (como en 4.7.1)
-        lam = np.zeros(d); lam[:RANGO] = SIGMA_W**2
+        lam = np.zeros(d_); lam[:RANGO] = SIGMA_W**2
     elif kind == "alineado":          # rango completo, varianza decreciente segun la profundidad
-        lam = SIGMA_W**2 * DECAY ** np.arange(d)
+        lam = SIGMA_W**2 * DECAY ** np.arange(d_)
     elif kind == "generico":          # mismo espectro, direcciones aleatorias
-        B, _ = np.linalg.qr(np.random.default_rng(1).standard_normal((d, d)))
-        lam = SIGMA_W**2 * DECAY ** np.arange(d)
-    S = B @ np.diag(lam) @ B.T
-    return (S + S.T) / 2, B
+        B, _ = np.linalg.qr(np.random.default_rng(1).standard_normal((d_, d_)))
+        lam = SIGMA_W**2 * DECAY ** np.arange(d_)
+    S = B @ np.diag(lam) @ B.conj().T
+    return (S + S.conj().T) / 2, B
 
 
 def kernel_temporal(tipo, N, param=None):
@@ -91,15 +94,25 @@ def kappa(Sigma, B, M):
 
 
 # ============================================================== esquema para (N, M) dados
+def adj(X):
+    """Traspuesta conjugada (en el caso real, la traspuesta)."""
+    return X.conj().T
+
+
 class Esquema:
+    """Vale en R^d y en C^d: los productos internos usan la traspuesta conjugada, y si A, G o Sigma son complejos
+    el forzado, el ruido y f se simulan gaussianos complejos circulares (E|x|^2 = sigma^2 por componente)."""
+
     def __init__(self, A, G, Sigma, M, N, sigma_n, Kt):
         """Kt: kernel temporal VERDADERO del forzado (N x N)."""
         self.A, self.G, self.Sigma, self.M, self.N, self.sn, self.Kt = A, G, Sigma, M, N, sigma_n, Kt
+        self.d, self.p = d, p = A.shape[0], G.shape[1]
+        self.complejo = any(np.iscomplexobj(X) for X in (A, G, Sigma))
         pw = [np.eye(d)]
         for _ in range(max(N, M) + 1):
             pw.append(A @ pw[-1])
         self.pw = pw
-        self.C = np.vstack([G.T @ pw[m] for m in range(M)])          # residuos <- w_n
+        self.C = np.vstack([adj(G) @ pw[m] for m in range(M)])       # residuos <- w_n
         self.Cpinv = np.linalg.pinv(self.C)
         self.Psi = np.kron(np.eye(N), self.C)
         self.Kw = np.kron(Kt, Sigma)                                  # covarianza verdadera de w
@@ -118,59 +131,66 @@ class Esquema:
                 Su[n * p + i, ie(n, 0, i)] = 1.0
         self.D, self.Su = D, Su
         self.Seta = sigma_n**2 * D @ D.T
-        L = np.zeros((N * d, N * d))
+        L = np.zeros((N * d, N * d), dtype=A.dtype)                    # complejo si A lo es
         for n in range(N):
             for k in range(n + 1):
                 L[n*d:(n+1)*d, k*d:(k+1)*d] = pw[n - k]
         self.L = L
-        self.O = np.vstack([G.T @ pw[n] for n in range(N + 1)])
+        self.O = np.vstack([adj(G) @ pw[n] for n in range(N + 1)])
         self.alpha = np.linalg.svd(self.O, compute_uv=False)[-1] ** 2
         self.es_frame = np.linalg.matrix_rank(self.O) == d
         self.Opinv = np.linalg.pinv(self.O)
         iota = np.vstack([np.zeros((p, N * p)), np.eye(N * p)])
-        self.T = self.Opinv @ iota @ np.kron(np.eye(N), G.T) @ L
+        self.T = self.Opinv @ iota @ np.kron(np.eye(N), adj(G)) @ L
 
     # ---- estimador lineal w_hat = H z (media posterior con un prior dado) ----
     def H(self, Kt_mod, Sigma_mod):
         Km = np.kron(Kt_mod, Sigma_mod)
-        Kz = self.Psi @ Km @ self.Psi.T + self.Seta
-        return np.linalg.solve(Kz, self.Psi @ Km).T
+        Kz = self.Psi @ Km @ adj(self.Psi) + self.Seta
+        return adj(np.linalg.solve(Kz, self.Psi @ Km))
 
     # ---- identidad exacta (vale si G_N es frame) ----
     def mse_exacto(self, H):
-        Aw = -self.T @ (np.eye(self.N * d) - H @ self.Psi)
+        Aw = -self.T @ (np.eye(self.N * self.d) - H @ self.Psi)
         Ae = self.T @ H @ self.D - self.Opinv @ self.Su
-        return np.trace(Aw @ self.Kw @ Aw.T) + self.sn**2 * np.sum(Ae**2)
+        return np.real(np.trace(Aw @ self.Kw @ adj(Aw))) + self.sn**2 * np.sum(np.abs(Ae)**2)
 
     def mse_sin_corregir(self):
-        return np.trace(self.T @ self.Kw @ self.T.T) + self.sn**2 * np.sum((self.Opinv @ self.Su) ** 2)
+        return np.real(np.trace(self.T @ self.Kw @ adj(self.T))) + self.sn**2 * np.sum(np.abs(self.Opinv @ self.Su) ** 2)
 
     def mse_solo_ruido(self):
-        return self.sn**2 * np.sum((self.Opinv @ self.Su) ** 2)
+        return self.sn**2 * np.sum(np.abs(self.Opinv @ self.Su) ** 2)
 
     # ---- simulacion de una realizacion ----
     def preparar_simulacion(self):
         self._Lt = np.linalg.cholesky(self.Kt + 1e-12 * np.eye(self.N))
         ev, V = np.linalg.eigh(self.Sigma)
-        self._Sh = V @ np.diag(np.sqrt(np.clip(ev, 0, None))) @ V.T
-        self._Gm = [self.G.T @ self.pw[m] for m in range(self.M + 1)]
+        self._Sh = V @ np.diag(np.sqrt(np.clip(ev, 0, None))) @ adj(V)
+        self._Gm = [adj(self.G) @ self.pw[m] for m in range(self.M + 1)]
+
+    def _normal(self, rng, forma):
+        """Normal estándar real o compleja circular ((a + i b) / sqrt 2: E|x|^2 = 1)."""
+        if not self.complejo:
+            return rng.standard_normal(forma)
+        return (rng.standard_normal(forma) + 1j * rng.standard_normal(forma)) / np.sqrt(2)
 
     def simular(self, rng):
-        N, M = self.N, self.M
-        f = rng.standard_normal(d); f /= np.linalg.norm(f)
-        W = self._Lt @ rng.standard_normal((N, d)) @ self._Sh.T
+        N, M, d, p = self.N, self.M, self.d, self.p
+        f = self._normal(rng, d); f /= np.linalg.norm(f)          # uniforme en la esfera unitaria (real o compleja)
+        W = self._Lt @ self._normal(rng, (N, d)) @ self._Sh.T     # filas w_n^T con w_n = Sh x_n, E[w w^*] = Sigma
         y = [f]
         for n in range(1, N + 1):
             y.append(self.A @ y[-1] + W[n - 1])
-        eps = self.sn * rng.standard_normal((N + 1, M + 1, p))
+        eps = self.sn * self._normal(rng, (N + 1, M + 1, p))
         u = np.array([[self._Gm[m] @ y[n] for m in range(M + 1)] for n in range(N + 1)]) + eps
         z = np.array([[u[n, m] - u[n - 1, m + 1] for m in range(M)] for n in range(1, N + 1)]).ravel()
         return f, u, z
 
     def reconstruir(self, u, w_hat):
         """w_hat: vector (N*d,). Devuelve f_hat."""
+        d = self.d
         delta = self.L @ w_hat
-        corr = np.vstack([np.zeros(p)] + [self.G.T @ delta[n*d:(n+1)*d] for n in range(self.N)])
+        corr = np.vstack([np.zeros(self.p)] + [adj(self.G) @ delta[n*d:(n+1)*d] for n in range(self.N)])
         return self.Opinv @ (u[:, 0, :] - corr).ravel()
 
     def sin_corregir(self, u):
@@ -362,18 +382,20 @@ if __name__ == "__main__":
 
     # ---------------- 4.7.3
     est = experimento_estimador()
-    print("\n=== 4.7.3  (N=12, forzado de rango 3, RMS sobre 300 realizaciones)")
+    print("\n=== 4.7.3  (N=12, forzado de rango 3, medianas de ||f - f_hat|| sobre 300 realizaciones)")
     print(f"{'proceso':22s} M  sigma_n  sin_corr  paso    movil   oraculo  rho=0.9  ajustado  rho_hat  (ident. oraculo)")
+    print("    oraculo: media posterior con el kernel temporal verdadero; rho=0.9: con AR(1) rho = 0,9 fijo")
     lineas = []
     for r in est:
         print(f"{r['nombre'][:22]:22s} {r['M']}  {r['sn']:.0e}   {r['sc']:.4f}  {r['paso']:.4f}  {r['movil']:.4f}  "
               f"{r['oraculo']:.4f}   {r['fijo']:.4f}   {r['ajustado']:.4f}    {r['rho_hat']:.2f}   ({r['ident_oraculo']:.4f})")
         sn_txt = "10^{-2}" if r["sn"] == 1e-2 else "10^{-3}"
-        # mismo formato que la tabla original: el "oraculo" es el modelo AR(1) con rho = 0,9 en todas las filas
-        lineas.append(f"{r['nombre']} & $({r['M']};\\,{sn_txt})$ & {fmt(r['paso'])} & {fmt(r['movil'])} & "
+        # columnas de la Tabla 4.2: la de "rho = 0,9 fijo" usa el modelo AR(1) con rho = 0,9 en todas las filas
+        lineas.append(f"{r['nombre']} & $({r['M']};\\,{sn_txt})$ & {fmt(r['sc'])} & {fmt(r['paso'])} & {fmt(r['movil'])} & "
                       f"{fmt(r['fijo'])} & {fmt(r['ajustado'])} & {fmt(r['rho_hat'], 2)}\\\\")
     with open(os.path.join(OUT, "tabla_estimador.tex"), "w") as fh:
-        fh.write("% proceso & (M,sigma_n) & por paso & prom. movil & oraculo & ajustado & rho_hat\n")
+        fh.write("% proceso & (M;sigma_n) & sin corregir & por paso & prom. movil & rho = 0,9 fijo & ajustado & rho_hat"
+                 "  (medianas)\n")
         fh.write("\n".join(lineas) + "\n")
 
     # ---------------- 4.7.2

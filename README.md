@@ -42,7 +42,7 @@ Orden necesario en `transporte/`: `comparacion_justa` lee los resultados de `exp
 ```
 cap2/            regresión GP (Capítulo 2): núcleo, figuras y verificación contra scikit-learn y GPy
 cap3/            GP temporal sobre un forzado escalar (Capítulo 3)
-cap4/            experimentos del Capítulo 4 (Secciones 4.7.1 a 4.7.3)
+cap4/            experimentos del Capítulo 4 (Secciones 4.7.1 a 4.7.4)
 transporte/      ejemplo de transporte (Sección 4.7.5)
   comun/         módulos compartidos: parámetros (config), operador A, forzado, sensores, frames, reconstrucción,
                  identidad exacta, posterior GP en espacios reducidos, operadores en Fourier, estilo de figuras
@@ -61,7 +61,8 @@ cuando supera 1 GB. Cada script imprime sus números y chequeos (conviene guarda
 | `cap2.figs_cap2_teoria` | Figs. 2.1 `marginal_vs_condicional`, 2.2 `bloques_covarianza`, 2.3 `rbf_lengthscale`, 2.4 `matern_suavidad` | 2.1, 2.4 | 2 s |
 | `cap2.figs_cap2_aplicacion` | Figs. 2.5 `prior_posterior`, 2.6 `efecto_lengthscale_lml`, 2.7 `superficie_lml`, 2.8 `costo_cholesky`; números de 2.7.1, Tablas 2.2 y 2.3, 2.7.4 y la observación del jitter (impresos) | 2.6, 2.7 | 10 s |
 | `cap3.figs_cap3` | Figs. 3.1 `prior_temporal`, 3.2 `posterior_forzante`; Tabla 3.2 (impresa) | 3.2, 3.6 | 1,5 min |
-| `cap4.experimentos_cap4` | Tabla 4.1 `tabla_orbita.tex`, Tabla 4.2 `tabla_estimador.tex`, Fig. 4.1 `reconstruccion_vs_M` | 4.7.1–4.7.3 | 35 s |
+| `cap4.experimentos_cap4` | Tabla 4.1 `tabla_orbita.tex`, Tabla 4.2 `tabla_estimador.tex` (con la columna sin corregir), Fig. 4.1 `reconstruccion_vs_M` | 4.7.1–4.7.3 | 35 s |
+| `cap4.reticulo` | Tabla 4.3 `tabla_reticulo.tex`; números de la Observación de símbolos pares (impresos) | 4.7.4 | 5 s |
 | `transporte.experimentos.video_transporte` + `figuras.video_transporte` | `cuadros`, `forzado_fuente`, `forzado_w`, `video.gif`/`.mp4` | 4.7.5 | 5 s |
 | `transporte.experimentos.diagnostico_frames` + `figuras.diagnostico_frames` | `alpha_vs_N`, `nucleos`, `invisibles`, `tabla_frames.tex`/`.csv` | 4.7.5 | 15 s |
 | `transporte.experimentos.experimento_1D` + `figuras.experimento_1D` | `error_1D`, `error_posicion_1D`, `presupuesto_1D`, `reconstruccion_2D`, `video_sensores.gif` y sus tablas | 4.7.5 | 1 min |
@@ -71,10 +72,12 @@ cuando supera 1 GB. Cada script imprime sus números y chequeos (conviene guarda
 | `transporte.experimentos.adveccion_difusion diagnostico` + `figuras.adveccion_difusion` | `alpha_vs_nu`, `alpha_vs_s`, `tabla_diagnostico_AD.tex`, `tabla_barrido_s_AD.tex` | 4.7.5 | 5 s |
 | `transporte.experimentos.adveccion_difusion experimento` + `figuras.adveccion_difusion` | `error_vs_M_AD`, `reconstruccion_AD`, `cuadros_AD`, `tabla_AD.tex` | 4.7.5 | 1 h (6,5 GB) |
 | `transporte.experimentos.barrido_N_64` + `figuras.barrido_N` | `error_vs_N`, `alpha_vs_N_barrido`, `tabla_barrido_N.tex` | 4.7.5 | 20 min (4,6 GB) |
-| `transporte.experimentos.comparacion_justa entero` / `ad` + `figuras.comparacion_justa` | `tabla_comparacion_justa.tex`, `figura_presentacion` (entero), `figura_presentacion_reconstruccion` y `_error` (advección-difusión) | 4.7.5 | 1,5 min cada uno |
+| `transporte.experimentos.comparacion_justa entero` / `ad` + `figuras.comparacion_justa` | `tabla_comparacion_justa.tex`, `figura_presentacion` (entero), `figura_presentacion_reconstruccion` y `_error` y Tabla 4.4 `tabla_transporte_AD.tex` (advección-difusión) | 4.7.5 | 1,5 min cada uno |
 | `transporte.figuras.sensores` | `sensores_2D_64`, `sensores_AD`, `sensores_comparacion` | 4.7.5 | 5 s |
 | `transporte.figuras.resumen_AD` | `resumen_errores_AD` | 4.7.5 | 2 s |
 | `transporte.experimentos.presupuesto_AD` + `figuras.presupuesto_AD` | `presupuesto/tabla_presupuesto_AD.tex` (advección-difusión a igual presupuesto total, m en {2, 4, 8}) | 4.7.5 | 8 min (5 GB) |
+
+Las tablas de `cap4/` (`tabla_orbita.tex`, `tabla_estimador.tex`, `tabla_reticulo.tex`) y `tabla_transporte_AD.tex` tienen solo las filas (sin `\begin{tabular}`), para pegarlas dentro de la tabla del informe.
 
 Los experimentos de `transporte/` verifican con `assert` sus cuentas: el operador (adjunta, unitariedad, `np.roll`),
 `alpha_N` por bloques contra el cálculo denso, el posterior y la identidad exacta en espacios reducidos contra

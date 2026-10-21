@@ -3,7 +3,8 @@ Tablas y figuras de la comparación a igual cantidad de sensores (Sección 4.7.5
 salida/transporte/<experimento>/comparacion_justa/resultados.npz:
     experimento_2D_64/comparacion_justa/   tabla_comparacion_justa.tex, figura_presentacion.pdf
     adveccion_difusion/comparacion_justa/  tabla_comparacion_justa.tex, figura_presentacion_reconstruccion.pdf,
-                                           figura_presentacion_error.pdf (nu = 0,1)
+                                           figura_presentacion_error.pdf (nu = 0,1),
+                                           tabla_transporte_AD.tex (Tabla 4.4: solo filas, nu = 0,1, M = 2)
 El naive estático (b1, b2) queda en el npz pero no se muestra.
 """
 import os
@@ -53,6 +54,30 @@ def tabla(r, ruta):
         fh.write("\n".join(lineas) + "\n\\bottomrule\n\\end{tabular}\n")
 
 
+NU_T44, M_T44 = 0.1, 2
+TABLA_4_4 = ["2 & 0,05 & 0,0395 & 0,0293 & 0,0065 & 0,0058 & 0,0023 \\\\",       # valores de la tesis
+             "2 & 0,2 & 0,1563 & 0,1169 & 0,0096 & 0,0058 & 0,0023 \\\\",
+             "8 & 0,05 & 0,0273 & 0,0218 & 0,0058 & 0,0058 & 0,0023 \\\\",
+             "8 & 0,2 & 0,1068 & 0,0867 & 0,0059 & 0,0058 & 0,0023 \\\\"]
+
+
+def tabla_transporte_ad(r, ruta):
+    """Tabla 4.4, solo filas: ell & razón & sin corregir & ingenua & GP & oráculo & denso (medianas, 4 decimales)."""
+    t = lambda v: f"{v:g}".replace(".", ",")
+    lineas = []
+    for ell in (2.0, 8.0):
+        for razon in (0.05, 0.2):
+            i = [k for k in range(len(r["ell"])) if np.isclose(r["nu"][k], NU_T44) and r["ell"][k] == ell
+                 and np.isclose(r["razon"][k], razon) and r["M"][k] == M_T44]
+            assert len(i) == 1, (ell, razon)
+            vals = [f"{float(r[k][i[0]]):.4f}".replace(".", ",") for k in ("sc", "dinamico", "gp", "oraculo", "denso")]
+            lineas.append(" & ".join([t(ell), t(razon)] + vals) + " \\\\")
+    assert lineas == TABLA_4_4, "\n".join(lineas)
+    with open(ruta, "w") as fh:
+        fh.write(f"% ell & razón & sin corregir & ingenua & GP & oráculo & denso  (s = 0,75, nu = 0,1, M = 2; medianas)\n")
+        fh.write("\n".join(lineas) + "\n")
+
+
 def figura(r, ruta, operador):
     f = r["fig_f"]
     fuente = r["fig_fuente"]
@@ -95,9 +120,9 @@ def titulo_hiper(r):
 
 
 def figuras_ad(r, d):
-    """Advección-difusión: reconstrucciones (f, naive dinámico, GP) y perturbación + errores, en dos figuras."""
+    """Advección-difusión: reconstrucciones (f, ingenua, GP) y perturbación + errores, en dos figuras."""
     f, fuente = r["fig_f"], r["fig_fuente"]
-    paneles = [(r["fig_f_dinamico"], "naive dinámico, $O_N^{\\dagger} u$\n(3072 sensores)"),
+    paneles = [(r["fig_f_dinamico"], "ingenua, $O_N^{\\dagger} u$\n(3072 sensores)"),
                (r["fig_f_gp"], "GP ($M = 2$)\n(3072 sensores: 1024 y 2 copias)")]
     sup = titulo_hiper(r)
     rutas = [os.path.join(d, "figura_presentacion_reconstruccion.pdf"), os.path.join(d, "figura_presentacion_error.pdf")]
@@ -141,7 +166,8 @@ def main():
         r = np.load(os.path.join(d, "resultados.npz"))
         tabla(r, os.path.join(d, "tabla_comparacion_justa.tex"))
         if operador == "ad":                                  # dos figuras: reconstrucciones y perturbación + errores
-            rutas = figuras_ad(r, d)
+            rutas = figuras_ad(r, d) + [os.path.join(d, "tabla_transporte_AD.tex")]
+            tabla_transporte_ad(r, rutas[-1])
         else:
             rutas = [os.path.join(d, "figura_presentacion.pdf")]
             figura(r, rutas[0], operador)
